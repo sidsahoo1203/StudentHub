@@ -20,6 +20,7 @@ const StudentDetail = () => {
             const res = await studentService.getById(id);
             setStudent(res.data);
         } catch (err) {
+            console.error('Failed to load student details', err);
             toast.error('Failed to load student details');
             navigate('/students');
         } finally {
@@ -34,19 +35,21 @@ const StudentDetail = () => {
             setStudent(prev => ({ ...prev, applicationStatus: newStatus }));
             toast.success('Application status updated');
         } catch (err) {
-            toast.error('Failed to update status');
+            console.error('Failed to update status', err);
+            toast.error(err.response?.data?.error || 'Failed to update status');
         } finally {
             setStatusUpdating(false);
         }
     };
 
     const handleDelete = async () => {
-        if (window.confirm('Are you sure you want to delete this application? This cannot be undone.')) {
+        if (globalThis.confirm('Are you sure you want to delete this application? This cannot be undone.')) {
             try {
                 await studentService.delete(id);
                 toast.success('Student deleted successfully');
                 navigate('/students');
             } catch (err) {
+                console.error('Failed to delete application', err);
                 toast.error('Failed to delete application');
             }
         }
@@ -54,6 +57,18 @@ const StudentDetail = () => {
 
     const getStatusBadgeClass = (status) => {
         return `badge badge-${status?.toLowerCase()}`;
+    };
+
+    const getMinimumCgpaForCourse = (course) => {
+        const normalizedCourse = (course || '').trim().toUpperCase();
+        if (['M.TECH', 'MBA', 'MCA'].includes(normalizedCourse)) return 7.0;
+        if (['B.TECH', 'BCA', 'BBA'].includes(normalizedCourse)) return 6.0;
+        return 6.5;
+    };
+
+    const getMinimumSchoolingPercentage = (course) => {
+        const normalizedCourse = (course || '').trim().toUpperCase();
+        return normalizedCourse.startsWith('M') ? 60 : 50;
     };
 
     if (loading) {
@@ -65,6 +80,15 @@ const StudentDetail = () => {
     }
 
     if (!student) return null;
+
+    const minCgpa = getMinimumCgpaForCourse(student.course);
+    const minSchoolingPercentage = getMinimumSchoolingPercentage(student.course);
+    const cgpaEligible = Number(student.cgpa || 0) >= minCgpa;
+    const hasSchoolingDetails = student.schoolingDetails && student.schoolingDetails.length > 0;
+    const schoolingEligible = !hasSchoolingDetails
+        ? true
+        : student.schoolingDetails.every((entry) => Number(entry.percentage || 0) >= minSchoolingPercentage);
+    const rejectionReasonEligible = student.notes && student.notes.trim().length >= 10;
 
     return (
         <div>
@@ -194,6 +218,37 @@ const StudentDetail = () => {
                 <div>
                     <div className="glass-panel detail-section" style={{ background: 'rgba(79, 70, 229, 0.05)', borderColor: 'rgba(79, 70, 229, 0.2)' }}>
                         <h3 style={{ marginBottom: '1.5rem', color: '#818cf8' }}>Application Status</h3>
+
+                        <div style={{ marginBottom: '1rem', padding: '0.9rem', border: '1px solid var(--border)', borderRadius: '8px', background: 'rgba(15, 23, 42, 0.35)' }}>
+                            <h4 style={{ marginBottom: '0.6rem', fontSize: '0.95rem', color: '#c7d2fe' }}>Approval Criteria</h4>
+                            <div style={{ fontSize: '0.85rem', marginBottom: '0.3rem' }}>
+                                CGPA: minimum {minCgpa.toFixed(1)} | Current: {student.cgpa ?? 'N/A'}
+                                <span style={{ marginLeft: '0.5rem', color: cgpaEligible ? '#34d399' : '#f87171' }}>
+                                    {cgpaEligible ? 'PASS' : 'FAIL'}
+                                </span>
+                            </div>
+                            <div style={{ fontSize: '0.85rem' }}>
+                                Schooling: each record minimum {minSchoolingPercentage}%
+                                <span style={{ marginLeft: '0.5rem', color: schoolingEligible ? '#34d399' : '#f87171' }}>
+                                    {schoolingEligible ? 'PASS' : 'FAIL'}
+                                </span>
+                            </div>
+                            {!hasSchoolingDetails && (
+                                <div style={{ marginTop: '0.35rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                                    Legacy record: approval can still proceed based on CGPA.
+                                </div>
+                            )}
+                        </div>
+
+                        <div style={{ marginBottom: '1.2rem', padding: '0.9rem', border: '1px solid var(--border)', borderRadius: '8px', background: 'rgba(15, 23, 42, 0.35)' }}>
+                            <h4 style={{ marginBottom: '0.6rem', fontSize: '0.95rem', color: '#fca5a5' }}>Rejection Criteria</h4>
+                            <div style={{ fontSize: '0.85rem' }}>
+                                Admin notes must contain rejection reason (minimum 10 characters)
+                                <span style={{ marginLeft: '0.5rem', color: rejectionReasonEligible ? '#34d399' : '#f87171' }}>
+                                    {rejectionReasonEligible ? 'PASS' : 'FAIL'}
+                                </span>
+                            </div>
+                        </div>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                             <button

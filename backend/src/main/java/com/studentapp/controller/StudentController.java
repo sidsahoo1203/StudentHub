@@ -4,7 +4,6 @@ import com.studentapp.model.ApplicationStatus;
 import com.studentapp.model.Student;
 import com.studentapp.service.StudentService;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,8 +16,13 @@ import java.util.Map;
 @CrossOrigin(origins = "http://localhost:5173")
 public class StudentController {
 
-    @Autowired
-    private StudentService studentService;
+    private static final String ERROR_KEY = "error";
+
+    private final StudentService studentService;
+
+    public StudentController(StudentService studentService) {
+        this.studentService = studentService;
+    }
 
     // Get all students
     @GetMapping
@@ -36,10 +40,10 @@ public class StudentController {
 
     // Create new student
     @PostMapping
-    public ResponseEntity<?> createStudent(@Valid @RequestBody Student student) {
+    public ResponseEntity<Object> createStudent(@Valid @RequestBody Student student) {
         if (studentService.emailExists(student.getEmail())) {
             return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Email already exists"));
+                    .body(Map.of(ERROR_KEY, "Email already exists"));
         }
         Student created = studentService.createStudent(student);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
@@ -47,7 +51,7 @@ public class StudentController {
 
     // Update student
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateStudent(@PathVariable Long id, @Valid @RequestBody Student student) {
+    public ResponseEntity<Object> updateStudent(@PathVariable Long id, @Valid @RequestBody Student student) {
         try {
             Student updated = studentService.updateStudent(id, student);
             return ResponseEntity.ok(updated);
@@ -93,13 +97,22 @@ public class StudentController {
 
     // Update application status
     @PatchMapping("/{id}/status")
-    public ResponseEntity<?> updateStatus(@PathVariable Long id, @RequestBody Map<String, String> body) {
+    public ResponseEntity<Object> updateStatus(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        String rawStatus = body.get("status");
+        if (rawStatus == null || rawStatus.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Status is required"));
+        }
+
+        final ApplicationStatus status;
         try {
-            ApplicationStatus status = ApplicationStatus.valueOf(body.get("status"));
+            status = ApplicationStatus.valueOf(rawStatus.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Invalid status"));
+        }
+
+        try {
             Student updated = studentService.updateStatus(id, status);
             return ResponseEntity.ok(updated);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Invalid status"));
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }

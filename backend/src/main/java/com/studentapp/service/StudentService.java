@@ -4,7 +4,6 @@ import com.studentapp.model.ApplicationStatus;
 import com.studentapp.model.SchoolingDetail;
 import com.studentapp.model.Student;
 import com.studentapp.repository.StudentRepository;
-import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -23,16 +22,16 @@ public class StudentService {
         return studentRepository.findAll();
     }
 
-    public Optional<Student> getStudentById(@NonNull Long id) {
+    public Optional<Student> getStudentById(Long id) {
         return studentRepository.findById(id);
     }
 
-    public Student createStudent(@NonNull Student student) {
+    public Student createStudent(Student student) {
         applyApplicationRules(student);
         return studentRepository.save(student);
     }
 
-    public Student updateStudent(@NonNull Long id, @NonNull Student studentDetails) {
+    public Student updateStudent(Long id, Student studentDetails) {
         Student student = studentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException(STUDENT_NOT_FOUND + id));
 
@@ -58,7 +57,7 @@ public class StudentService {
         return studentRepository.save(student);
     }
 
-    public void deleteStudent(@NonNull Long id) {
+    public void deleteStudent(Long id) {
         Student student = studentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException(STUDENT_NOT_FOUND + id));
         studentRepository.delete(student);
@@ -80,7 +79,7 @@ public class StudentService {
         return studentRepository.findByCourse(course);
     }
 
-    public Student updateStatus(@NonNull Long id, @NonNull ApplicationStatus status) {
+    public Student updateStatus(Long id, ApplicationStatus status) {
         Student student = studentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException(STUDENT_NOT_FOUND + id));
         validateStatusChange(student, status);
@@ -132,6 +131,9 @@ public class StudentService {
             return false;
         }
 
+        String normalizedCourse = student.getCourse().trim().toUpperCase();
+        double minCgpa = getMinimumCgpaForCourse(normalizedCourse);
+
         List<Double> schoolingPercentages = student.getSchoolingDetails() == null
                 ? Collections.emptyList()
                 : student.getSchoolingDetails().stream()
@@ -139,12 +141,12 @@ public class StudentService {
                 .filter(Objects::nonNull)
                 .toList();
 
+        // Backward compatibility for legacy records created before schooling details were introduced.
         if (schoolingPercentages.isEmpty()) {
-            return false;
+            return student.getCgpa() >= minCgpa;
         }
 
-        double minCgpa = getMinimumCgpaForCourse(student.getCourse());
-        double minSchoolingPercentage = student.getCourse().startsWith("M") ? 60.0 : 50.0;
+        double minSchoolingPercentage = normalizedCourse.startsWith("M") ? 60.0 : 50.0;
         boolean schoolingEligible = schoolingPercentages.stream().allMatch(value -> value >= minSchoolingPercentage);
 
         return student.getCgpa() >= minCgpa && schoolingEligible;
