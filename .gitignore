@@ -1,0 +1,20 @@
+# OS and editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Backend
+backend/target/
+
+# Generic build outputs
+target/
+
+# Runtime database files
+backend/data/
+*.mv.db
+*.trace.db
