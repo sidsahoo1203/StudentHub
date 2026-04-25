@@ -175,6 +175,25 @@ const StudentDetail = () => {
                                 <div className="detail-value">{student.phone}</div>
                             </div>
                         </div>
+                        <div className="form-row mt-4">
+                            <div className="detail-item">
+                                <div className="detail-label">Guardian/Parent Name</div>
+                                <div className="detail-value">{student.guardianName || 'N/A'}</div>
+                            </div>
+                            <div className="detail-item">
+                                <div className="detail-label">Guardian Phone</div>
+                                <div className="detail-value">{student.guardianPhone || 'N/A'}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="glass-panel detail-section">
+                        <h3 style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <FiBookOpen color="var(--primary)" /> Statement of Purpose
+                        </h3>
+                        <p style={{ lineHeight: '1.6', color: 'var(--text-main)', background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '8px' }}>
+                            {student.statementOfPurpose || 'No Statement of Purpose provided.'}
+                        </p>
                     </div>
 
                     <div className="glass-panel detail-section">
@@ -195,6 +214,14 @@ const StudentDetail = () => {
 
                 <div>
                     <div className="glass-panel detail-section" style={{ background: 'rgba(79, 70, 229, 0.05)', borderColor: 'rgba(79, 70, 229, 0.2)' }}>
+                        <h3 style={{ marginBottom: '1.5rem', color: '#818cf8' }}>Application Fee</h3>
+                        <div style={{ padding: '0.75rem', borderRadius: '6px', textAlign: 'center', fontWeight: 'bold', marginBottom: '2rem',
+                            background: student.feeStatus === 'PAID' ? 'rgba(52, 211, 153, 0.2)' : student.feeStatus === 'WAIVED' ? 'rgba(96, 165, 250, 0.2)' : 'rgba(251, 191, 36, 0.2)',
+                            color: student.feeStatus === 'PAID' ? '#34d399' : student.feeStatus === 'WAIVED' ? '#60a5fa' : '#fbbf24'
+                        }}>
+                            {student.feeStatus || 'PENDING'}
+                        </div>
+
                         <h3 style={{ marginBottom: '1.5rem', color: '#818cf8' }}>Application Status</h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                             <button className={`btn ${student.applicationStatus === 'PENDING' ? 'btn-primary' : 'btn-secondary'}`} style={student.applicationStatus === 'PENDING' ? { background: '#fbbf24', color: '#000' } : {}} onClick={() => handleStatusUpdate('PENDING')} disabled={statusUpdating}>Set as Pending</button>
