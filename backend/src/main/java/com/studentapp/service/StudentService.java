@@ -1,9 +1,10 @@
 package com.studentapp.service;
 
+import com.studentapp.model.AcademicRecord;
 import com.studentapp.model.ApplicationStatus;
-import com.studentapp.model.SchoolingDetail;
 import com.studentapp.model.Student;
 import com.studentapp.repository.StudentRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -11,12 +12,8 @@ import java.util.*;
 @Service
 public class StudentService {
 
-    private static final String STUDENT_NOT_FOUND = "Student not found with id: ";
-    private final StudentRepository studentRepository;
-
-    public StudentService(StudentRepository studentRepository) {
-        this.studentRepository = studentRepository;
-    }
+    @Autowired
+    private StudentRepository studentRepository;
 
     public List<Student> getAllStudents() {
         return studentRepository.findAll();
@@ -27,13 +24,13 @@ public class StudentService {
     }
 
     public Student createStudent(Student student) {
-        applyApplicationRules(student);
+        evaluateEligibility(student);
         return studentRepository.save(student);
     }
 
     public Student updateStudent(Long id, Student studentDetails) {
         Student student = studentRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException(STUDENT_NOT_FOUND + id));
+                .orElseThrow(() -> new RuntimeException("Student not found with id: " + id));
 
         student.setFirstName(studentDetails.getFirstName());
         student.setLastName(studentDetails.getLastName());
@@ -47,19 +44,95 @@ public class StudentService {
         student.setPincode(studentDetails.getPincode());
         student.setCourse(studentDetails.getCourse());
         student.setDepartment(studentDetails.getDepartment());
-        student.setSchoolingDetails(studentDetails.getSchoolingDetails());
-        student.setCgpa(studentDetails.getCgpa());
+        
+        student.setGuardianName(studentDetails.getGuardianName());
+        student.setGuardianPhone(studentDetails.getGuardianPhone());
+        student.setStatementOfPurpose(studentDetails.getStatementOfPurpose());
+        if(studentDetails.getFeeStatus() != null) {
+            student.setFeeStatus(studentDetails.getFeeStatus());
+        }
+        
+        // Update Academic Records
+        student.setAcademicRecords(studentDetails.getAcademicRecords());
+        
         student.setApplicationStatus(studentDetails.getApplicationStatus());
         student.setNotes(studentDetails.getNotes());
 
-        applyApplicationRules(student);
+        evaluateEligibility(student);
 
         return studentRepository.save(student);
     }
 
+    private void evaluateEligibility(Student student) {
+        String course = student.getCourse();
+        List<AcademicRecord> records = student.getAcademicRecords();
+        
+        if (records == null || records.isEmpty()) {
+            student.setEligibilityStatus("NEEDS_REVIEW");
+            student.setEligibilityReason("No academic records provided.");
+            return;
+        }
+
+        if ("B.Tech".equalsIgnoreCase(course)) {
+            boolean has12th = false;
+            boolean meetsCriteria = false;
+            for (AcademicRecord ar : records) {
+                if ("12th Standard".equalsIgnoreCase(ar.getDegreeType())) {
+                    has12th = true;
+                    if (ar.getScore() != null && ar.getScore() >= 60.0) {
+                        meetsCriteria = true;
+                    }
+                }
+            }
+            if (!has12th) {
+                student.setEligibilityStatus("NOT_ELIGIBLE");
+                student.setEligibilityReason("Missing 12th Standard record.");
+            } else if (!meetsCriteria) {
+                student.setEligibilityStatus("NOT_ELIGIBLE");
+                student.setEligibilityReason("12th Standard score below 60%.");
+            } else {
+                student.setEligibilityStatus("ELIGIBLE");
+                student.setEligibilityReason("Meets all criteria for B.Tech.");
+            }
+        } 
+        else if ("M.Tech".equalsIgnoreCase(course) || "MBA".equalsIgnoreCase(course)) {
+            boolean hasUG = false;
+            boolean meetsCriteria = false;
+            double minScore = "M.Tech".equalsIgnoreCase(course) ? 60.0 : 50.0; // Assume CGPA is scaled to percentage conceptually here or checked directly
+            
+            for (AcademicRecord ar : records) {
+                if ("Undergraduate".equalsIgnoreCase(ar.getDegreeType())) {
+                    hasUG = true;
+                    double effectiveScore = ar.getScore();
+                    if ("CGPA".equalsIgnoreCase(ar.getScoreType())) {
+                        effectiveScore = ar.getScore() * 10; // Simple conversion for baseline check
+                    }
+                    if (effectiveScore >= minScore) {
+                        meetsCriteria = true;
+                    }
+                }
+            }
+            
+            if (!hasUG) {
+                student.setEligibilityStatus("NOT_ELIGIBLE");
+                student.setEligibilityReason("Missing Undergraduate record.");
+            } else if (!meetsCriteria) {
+                student.setEligibilityStatus("NOT_ELIGIBLE");
+                student.setEligibilityReason("Undergraduate score does not meet minimum requirement (" + minScore + "% or equivalent CGPA).");
+            } else {
+                student.setEligibilityStatus("ELIGIBLE");
+                student.setEligibilityReason("Meets all criteria for " + course + ".");
+            }
+        } 
+        else {
+            student.setEligibilityStatus("NEEDS_REVIEW");
+            student.setEligibilityReason("Manual review required for custom course.");
+        }
+    }
+
     public void deleteStudent(Long id) {
         Student student = studentRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException(STUDENT_NOT_FOUND + id));
+                .orElseThrow(() -> new RuntimeException("Student not found with id: " + id));
         studentRepository.delete(student);
     }
 
@@ -81,8 +154,7 @@ public class StudentService {
 
     public Student updateStatus(Long id, ApplicationStatus status) {
         Student student = studentRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException(STUDENT_NOT_FOUND + id));
-        validateStatusChange(student, status);
+                .orElseThrow(() -> new RuntimeException("Student not found with id: " + id));
         student.setApplicationStatus(status);
         return studentRepository.save(student);
     }
@@ -102,62 +174,5 @@ public class StudentService {
 
     public boolean emailExists(String email) {
         return studentRepository.existsByEmail(email);
-    }
-
-    private void applyApplicationRules(Student student) {
-        if (student.getApplicationStatus() == null) {
-            student.setApplicationStatus(ApplicationStatus.PENDING);
-        }
-        validateStatusChange(student, student.getApplicationStatus());
-    }
-
-    private void validateStatusChange(Student student, ApplicationStatus targetStatus) {
-        if (targetStatus == ApplicationStatus.APPROVED && !meetsEligibilityCriteria(student)) {
-            throw new IllegalArgumentException(
-                    "Application cannot be approved. Applicant does not meet academic criteria for the selected course."
-            );
-        }
-
-        if (targetStatus == ApplicationStatus.REJECTED
-                && (student.getNotes() == null || student.getNotes().trim().length() < 10)) {
-            throw new IllegalArgumentException(
-                    "A rejection reason is required in notes (minimum 10 characters)."
-            );
-        }
-    }
-
-    private boolean meetsEligibilityCriteria(Student student) {
-        if (student.getCgpa() == null || student.getCourse() == null) {
-            return false;
-        }
-
-        String normalizedCourse = student.getCourse().trim().toUpperCase();
-        double minCgpa = getMinimumCgpaForCourse(normalizedCourse);
-
-        List<Double> schoolingPercentages = student.getSchoolingDetails() == null
-                ? Collections.emptyList()
-                : student.getSchoolingDetails().stream()
-                .map(SchoolingDetail::getPercentage)
-                .filter(Objects::nonNull)
-                .toList();
-
-        // Backward compatibility for legacy records created before schooling details were introduced.
-        if (schoolingPercentages.isEmpty()) {
-            return student.getCgpa() >= minCgpa;
-        }
-
-        double minSchoolingPercentage = normalizedCourse.startsWith("M") ? 60.0 : 50.0;
-        boolean schoolingEligible = schoolingPercentages.stream().allMatch(value -> value >= minSchoolingPercentage);
-
-        return student.getCgpa() >= minCgpa && schoolingEligible;
-    }
-
-    private double getMinimumCgpaForCourse(String course) {
-        String normalizedCourse = course.trim().toUpperCase();
-        return switch (normalizedCourse) {
-            case "M.TECH", "MBA", "MCA" -> 7.0;
-            case "B.TECH", "BCA", "BBA" -> 6.0;
-            default -> 6.5;
-        };
     }
 }

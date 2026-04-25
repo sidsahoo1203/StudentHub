@@ -2,7 +2,6 @@ package com.studentapp.model;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
-import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -32,7 +31,7 @@ public class Student {
     private String email;
 
     @NotBlank(message = "Phone number is required")
-    @Pattern(regexp = "^\\d{10}$", message = "Phone number must be 10 digits")
+    @Pattern(regexp = "^[0-9]{10}$", message = "Phone number must be 10 digits")
     @Column(name = "phone")
     private String phone;
 
@@ -58,7 +57,7 @@ public class Student {
     @Column(name = "state")
     private String state;
 
-    @Pattern(regexp = "^\\d{6}$", message = "Pincode must be 6 digits")
+    @Pattern(regexp = "^[0-9]{6}$", message = "Pincode must be 6 digits")
     @Column(name = "pincode")
     private String pincode;
 
@@ -70,16 +69,20 @@ public class Student {
     @Column(name = "department")
     private String department;
 
-    @Valid
-    @Size(min = 1, message = "At least one schooling detail is required")
-    @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(name = "student_schooling_details", joinColumns = @JoinColumn(name = "student_id"))
-    private List<SchoolingDetail> schoolingDetails = new ArrayList<>();
+    @Column(name = "guardian_name")
+    private String guardianName;
 
-    @DecimalMin(value = "0.0", message = "CGPA must be at least 0.0")
-    @DecimalMax(value = "10.0", message = "CGPA must not exceed 10.0")
-    @Column(name = "cgpa")
-    private Double cgpa;
+    @Column(name = "guardian_phone")
+    private String guardianPhone;
+
+    @Column(name = "statement_of_purpose", length = 3000)
+    private String statementOfPurpose;
+
+    @Column(name = "fee_status")
+    private String feeStatus = "PENDING";
+
+    @OneToMany(mappedBy = "student", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<AcademicRecord> academicRecords = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
     @Column(name = "application_status")
@@ -95,9 +98,13 @@ public class Student {
     @Column(name = "notes", length = 500)
     private String notes;
 
-    public Student() {
-        // Required by JPA.
-    }
+    @Column(name = "eligibility_status")
+    private String eligibilityStatus; // ELIGIBLE, NOT_ELIGIBLE, NEEDS_REVIEW
+
+    @Column(name = "eligibility_reason", length = 1000)
+    private String eligibilityReason;
+
+    public Student() {}
 
     @PrePersist
     protected void onCreate() {
@@ -113,160 +120,96 @@ public class Student {
         updatedAt = LocalDateTime.now();
     }
 
+    // Helper method to add academic records
+    public void addAcademicRecord(AcademicRecord record) {
+        academicRecords.add(record);
+        record.setStudent(this);
+    }
+
+    public void removeAcademicRecord(AcademicRecord record) {
+        academicRecords.remove(record);
+        record.setStudent(null);
+    }
+
     // Getters and Setters
-    public Long getId() {
-        return id;
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public String getFirstName() { return firstName; }
+    public void setFirstName(String firstName) { this.firstName = firstName; }
+
+    public String getLastName() { return lastName; }
+    public void setLastName(String lastName) { this.lastName = lastName; }
+
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+
+    public String getPhone() { return phone; }
+    public void setPhone(String phone) { this.phone = phone; }
+
+    public LocalDate getDateOfBirth() { return dateOfBirth; }
+    public void setDateOfBirth(LocalDate dateOfBirth) { this.dateOfBirth = dateOfBirth; }
+
+    public String getGender() { return gender; }
+    public void setGender(String gender) { this.gender = gender; }
+
+    public String getAddress() { return address; }
+    public void setAddress(String address) { this.address = address; }
+
+    public String getCity() { return city; }
+    public void setCity(String city) { this.city = city; }
+
+    public String getState() { return state; }
+    public void setState(String state) { this.state = state; }
+
+    public String getPincode() { return pincode; }
+    public void setPincode(String pincode) { this.pincode = pincode; }
+
+    public String getCourse() { return course; }
+    public void setCourse(String course) { this.course = course; }
+
+    public String getDepartment() { return department; }
+    public void setDepartment(String department) { this.department = department; }
+
+    public String getGuardianName() { return guardianName; }
+    public void setGuardianName(String guardianName) { this.guardianName = guardianName; }
+
+    public String getGuardianPhone() { return guardianPhone; }
+    public void setGuardianPhone(String guardianPhone) { this.guardianPhone = guardianPhone; }
+
+    public String getStatementOfPurpose() { return statementOfPurpose; }
+    public void setStatementOfPurpose(String statementOfPurpose) { this.statementOfPurpose = statementOfPurpose; }
+
+    public String getFeeStatus() { return feeStatus; }
+    public void setFeeStatus(String feeStatus) { this.feeStatus = feeStatus; }
+
+    public List<AcademicRecord> getAcademicRecords() { return academicRecords; }
+    public void setAcademicRecords(List<AcademicRecord> academicRecords) { 
+        this.academicRecords.clear();
+        if (academicRecords != null) {
+            for (AcademicRecord record : academicRecords) {
+                addAcademicRecord(record);
+            }
+        }
     }
 
-    public void setId(Long id) {
-        this.id = id;
-    }
+    public ApplicationStatus getApplicationStatus() { return applicationStatus; }
+    public void setApplicationStatus(ApplicationStatus applicationStatus) { this.applicationStatus = applicationStatus; }
 
-    public String getFirstName() {
-        return firstName;
-    }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
-    public void setFirstName(String firstName) {
-        this.firstName = firstName;
-    }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 
-    public String getLastName() {
-        return lastName;
-    }
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
 
-    public void setLastName(String lastName) {
-        this.lastName = lastName;
-    }
+    public String getEligibilityStatus() { return eligibilityStatus; }
+    public void setEligibilityStatus(String eligibilityStatus) { this.eligibilityStatus = eligibilityStatus; }
 
-    public String getEmail() {
-        return email;
-    }
+    public String getEligibilityReason() { return eligibilityReason; }
+    public void setEligibilityReason(String eligibilityReason) { this.eligibilityReason = eligibilityReason; }
 
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
-    public String getPhone() {
-        return phone;
-    }
-
-    public void setPhone(String phone) {
-        this.phone = phone;
-    }
-
-    public LocalDate getDateOfBirth() {
-        return dateOfBirth;
-    }
-
-    public void setDateOfBirth(LocalDate dateOfBirth) {
-        this.dateOfBirth = dateOfBirth;
-    }
-
-    public String getGender() {
-        return gender;
-    }
-
-    public void setGender(String gender) {
-        this.gender = gender;
-    }
-
-    public String getAddress() {
-        return address;
-    }
-
-    public void setAddress(String address) {
-        this.address = address;
-    }
-
-    public String getCity() {
-        return city;
-    }
-
-    public void setCity(String city) {
-        this.city = city;
-    }
-
-    public String getState() {
-        return state;
-    }
-
-    public void setState(String state) {
-        this.state = state;
-    }
-
-    public String getPincode() {
-        return pincode;
-    }
-
-    public void setPincode(String pincode) {
-        this.pincode = pincode;
-    }
-
-    public String getCourse() {
-        return course;
-    }
-
-    public void setCourse(String course) {
-        this.course = course;
-    }
-
-    public String getDepartment() {
-        return department;
-    }
-
-    public void setDepartment(String department) {
-        this.department = department;
-    }
-
-    public List<SchoolingDetail> getSchoolingDetails() {
-        return schoolingDetails;
-    }
-
-    public void setSchoolingDetails(List<SchoolingDetail> schoolingDetails) {
-        this.schoolingDetails = schoolingDetails;
-    }
-
-    public Double getCgpa() {
-        return cgpa;
-    }
-
-    public void setCgpa(Double cgpa) {
-        this.cgpa = cgpa;
-    }
-
-    public ApplicationStatus getApplicationStatus() {
-        return applicationStatus;
-    }
-
-    public void setApplicationStatus(ApplicationStatus applicationStatus) {
-        this.applicationStatus = applicationStatus;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-    }
-
-    public String getNotes() {
-        return notes;
-    }
-
-    public void setNotes(String notes) {
-        this.notes = notes;
-    }
-
-    public String getFullName() {
-        return firstName + " " + lastName;
-    }
+    public String getFullName() { return firstName + " " + lastName; }
 }

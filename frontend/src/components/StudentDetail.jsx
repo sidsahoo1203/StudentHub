@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { studentService } from '../services/api';
-import { FiArrowLeft, FiEdit2, FiTrash2, FiClock, FiCalendar, FiMapPin, FiBookOpen } from 'react-icons/fi';
+import { FiArrowLeft, FiEdit2, FiTrash2, FiClock, FiCalendar, FiMapPin, FiBookOpen, FiAward, FiAlertTriangle, FiCheckCircle, FiXCircle } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 
 const StudentDetail = () => {
@@ -20,7 +20,6 @@ const StudentDetail = () => {
             const res = await studentService.getById(id);
             setStudent(res.data);
         } catch (err) {
-            console.error('Failed to load student details', err);
             toast.error('Failed to load student details');
             navigate('/students');
         } finally {
@@ -35,70 +34,62 @@ const StudentDetail = () => {
             setStudent(prev => ({ ...prev, applicationStatus: newStatus }));
             toast.success('Application status updated');
         } catch (err) {
-            console.error('Failed to update status', err);
-            toast.error(err.response?.data?.error || 'Failed to update status');
+            toast.error('Failed to update status');
         } finally {
             setStatusUpdating(false);
         }
     };
 
     const handleDelete = async () => {
-        if (globalThis.confirm('Are you sure you want to delete this application? This cannot be undone.')) {
+        if (window.confirm('Are you sure you want to delete this application? This cannot be undone.')) {
             try {
                 await studentService.delete(id);
                 toast.success('Student deleted successfully');
                 navigate('/students');
             } catch (err) {
-                console.error('Failed to delete application', err);
                 toast.error('Failed to delete application');
             }
         }
     };
 
     const getStatusBadgeClass = (status) => {
-        return `badge badge-${status?.toLowerCase()}`;
+        if (!status) return 'badge badge-pending';
+        return `badge badge-${status.toLowerCase()}`;
     };
 
-    const getMinimumCgpaForCourse = (course) => {
-        const normalizedCourse = (course || '').trim().toUpperCase();
-        if (['M.TECH', 'MBA', 'MCA'].includes(normalizedCourse)) return 7.0;
-        if (['B.TECH', 'BCA', 'BBA'].includes(normalizedCourse)) return 6.0;
-        return 6.5;
-    };
+    const renderEligibilityAlert = () => {
+        if (!student.eligibilityStatus) return null;
+        
+        let color, Icon, bg;
+        if (student.eligibilityStatus === 'ELIGIBLE') {
+            color = '#34d399'; bg = 'rgba(16, 185, 129, 0.1)'; Icon = FiCheckCircle;
+        } else if (student.eligibilityStatus === 'NOT_ELIGIBLE') {
+            color = '#f87171'; bg = 'rgba(239, 68, 68, 0.1)'; Icon = FiXCircle;
+        } else {
+            color = '#fbbf24'; bg = 'rgba(245, 158, 11, 0.1)'; Icon = FiAlertTriangle;
+        }
 
-    const getMinimumSchoolingPercentage = (course) => {
-        const normalizedCourse = (course || '').trim().toUpperCase();
-        return normalizedCourse.startsWith('M') ? 60 : 50;
-    };
-
-    if (loading) {
         return (
-            <div className="loader-container">
-                <div className="loader"></div>
+            <div style={{ background: bg, border: `1px solid ${color}`, padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                <Icon color={color} size={20} style={{ marginTop: '2px' }} />
+                <div>
+                    <h4 style={{ color: color, marginBottom: '0.25rem', fontWeight: '600', textTransform: 'capitalize' }}>
+                        System Validation: {student.eligibilityStatus.replace('_', ' ')}
+                    </h4>
+                    <p style={{ fontSize: '0.9rem', color: 'var(--text-main)' }}>{student.eligibilityReason}</p>
+                </div>
             </div>
         );
-    }
+    };
 
+    if (loading) return <div className="loader-container"><div className="loader"></div></div>;
     if (!student) return null;
-
-    const minCgpa = getMinimumCgpaForCourse(student.course);
-    const minSchoolingPercentage = getMinimumSchoolingPercentage(student.course);
-    const cgpaEligible = Number(student.cgpa || 0) >= minCgpa;
-    const hasSchoolingDetails = student.schoolingDetails && student.schoolingDetails.length > 0;
-    const schoolingEligible = !hasSchoolingDetails
-        ? true
-        : student.schoolingDetails.every((entry) => Number(entry.percentage || 0) >= minSchoolingPercentage);
-    const rejectionReasonEligible = student.notes && student.notes.trim().length >= 10;
 
     return (
         <div>
             <div className="page-header" style={{ alignItems: 'flex-start' }}>
                 <div>
-                    <button
-                        className="btn btn-secondary"
-                        style={{ marginBottom: '1rem', padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
-                        onClick={() => navigate('/students')}
-                    >
+                    <button className="btn btn-secondary" style={{ marginBottom: '1rem', padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={() => navigate('/students')}>
                         <FiArrowLeft /> Back to List
                     </button>
                     <h1>{student.firstName} {student.lastName}</h1>
@@ -109,7 +100,6 @@ const StudentDetail = () => {
                         </span>
                     </div>
                 </div>
-
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button className="btn btn-secondary" onClick={() => navigate(`/students/${id}/edit`)}>
                         <FiEdit2 /> Edit
@@ -122,11 +112,12 @@ const StudentDetail = () => {
 
             <div className="detail-grid mt-6">
                 <div>
+                    {renderEligibilityAlert()}
+
                     <div className="glass-panel detail-section">
                         <h3 style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <FiBookOpen color="var(--primary)" /> Academic Profile
+                            <FiBookOpen color="var(--primary)" /> Application Details
                         </h3>
-
                         <div className="form-row">
                             <div className="detail-item">
                                 <div className="detail-label">Course Applied For</div>
@@ -136,42 +127,40 @@ const StudentDetail = () => {
                                 <div className="detail-label">Department</div>
                                 <div className="detail-value">{student.department}</div>
                             </div>
-                            <div className="detail-item">
-                                <div className="detail-label">CGPA</div>
-                                <div className="detail-value">{student.cgpa || 'N/A'}</div>
-                            </div>
                         </div>
+                    </div>
 
-                        <div style={{ marginTop: '1rem' }}>
-                            <div className="detail-label" style={{ marginBottom: '0.75rem' }}>Schooling Details</div>
-                            {student.schoolingDetails && student.schoolingDetails.length > 0 ? (
-                                <div style={{ display: 'grid', gap: '0.75rem' }}>
-                                    {student.schoolingDetails.map((entry, index) => (
-                                        <div
-                                            key={`${entry.qualification}-${entry.schoolName}-${index}`}
-                                            style={{ padding: '0.75rem', border: '1px solid var(--border)', borderRadius: '8px' }}
-                                        >
-                                            <div style={{ fontWeight: 600 }}>{entry.qualification}</div>
-                                            <div className="text-muted" style={{ fontSize: '0.9rem' }}>
-                                                {entry.schoolName} | {entry.board}
-                                            </div>
-                                            <div style={{ marginTop: '0.25rem' }}>
-                                                {entry.percentage}% | Passing Year: {entry.passingYear}
-                                            </div>
+                    <div className="glass-panel detail-section">
+                        <h3 style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <FiAward color="var(--primary)" /> Academic History
+                        </h3>
+                        {student.academicRecords && student.academicRecords.length > 0 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                {student.academicRecords.map((record, index) => (
+                                    <div key={index} style={{ padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', borderLeft: '3px solid var(--primary)' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                                            <strong style={{ fontSize: '1.1rem' }}>{record.degreeType}</strong>
+                                            <span style={{ background: 'rgba(255,255,255,0.1)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.8rem' }}>
+                                                Class of {record.yearOfPassing}
+                                            </span>
                                         </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="detail-value">N/A</div>
-                            )}
-                        </div>
+                                        <p style={{ margin: '0.25rem 0', color: 'var(--text-main)' }}>{record.institutionName}</p>
+                                        <p style={{ margin: '0.25rem 0', fontSize: '0.9rem', color: 'var(--text-muted)' }}>{record.boardOrUniversity}</p>
+                                        <div style={{ marginTop: '0.75rem', fontWeight: '600' }}>
+                                            Score: {record.score} {record.scoreType === 'PERCENTAGE' ? '%' : 'CGPA'}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-muted italic">No academic records provided.</p>
+                        )}
                     </div>
 
                     <div className="glass-panel detail-section">
                         <h3 style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <FiCalendar color="var(--primary)" /> Personal Information
                         </h3>
-
                         <div className="form-row">
                             <div className="detail-item">
                                 <div className="detail-label">Date of Birth</div>
@@ -192,25 +181,14 @@ const StudentDetail = () => {
                         <h3 style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <FiMapPin color="var(--primary)" /> Address details
                         </h3>
-
                         <div className="detail-item">
                             <div className="detail-label">Full Address</div>
                             <div className="detail-value">{student.address}</div>
                         </div>
-
                         <div className="form-row mt-4">
-                            <div className="detail-item">
-                                <div className="detail-label">City</div>
-                                <div className="detail-value">{student.city}</div>
-                            </div>
-                            <div className="detail-item">
-                                <div className="detail-label">State</div>
-                                <div className="detail-value">{student.state}</div>
-                            </div>
-                            <div className="detail-item">
-                                <div className="detail-label">Pincode</div>
-                                <div className="detail-value">{student.pincode}</div>
-                            </div>
+                            <div className="detail-item"><div className="detail-label">City</div><div className="detail-value">{student.city}</div></div>
+                            <div className="detail-item"><div className="detail-label">State</div><div className="detail-value">{student.state}</div></div>
+                            <div className="detail-item"><div className="detail-label">Pincode</div><div className="detail-value">{student.pincode}</div></div>
                         </div>
                     </div>
                 </div>
@@ -218,104 +196,25 @@ const StudentDetail = () => {
                 <div>
                     <div className="glass-panel detail-section" style={{ background: 'rgba(79, 70, 229, 0.05)', borderColor: 'rgba(79, 70, 229, 0.2)' }}>
                         <h3 style={{ marginBottom: '1.5rem', color: '#818cf8' }}>Application Status</h3>
-
-                        <div style={{ marginBottom: '1rem', padding: '0.9rem', border: '1px solid var(--border)', borderRadius: '8px', background: 'rgba(15, 23, 42, 0.35)' }}>
-                            <h4 style={{ marginBottom: '0.6rem', fontSize: '0.95rem', color: '#c7d2fe' }}>Approval Criteria</h4>
-                            <div style={{ fontSize: '0.85rem', marginBottom: '0.3rem' }}>
-                                CGPA: minimum {minCgpa.toFixed(1)} | Current: {student.cgpa ?? 'N/A'}
-                                <span style={{ marginLeft: '0.5rem', color: cgpaEligible ? '#34d399' : '#f87171' }}>
-                                    {cgpaEligible ? 'PASS' : 'FAIL'}
-                                </span>
-                            </div>
-                            <div style={{ fontSize: '0.85rem' }}>
-                                Schooling: each record minimum {minSchoolingPercentage}%
-                                <span style={{ marginLeft: '0.5rem', color: schoolingEligible ? '#34d399' : '#f87171' }}>
-                                    {schoolingEligible ? 'PASS' : 'FAIL'}
-                                </span>
-                            </div>
-                            {!hasSchoolingDetails && (
-                                <div style={{ marginTop: '0.35rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                                    Legacy record: approval can still proceed based on CGPA.
-                                </div>
-                            )}
-                        </div>
-
-                        <div style={{ marginBottom: '1.2rem', padding: '0.9rem', border: '1px solid var(--border)', borderRadius: '8px', background: 'rgba(15, 23, 42, 0.35)' }}>
-                            <h4 style={{ marginBottom: '0.6rem', fontSize: '0.95rem', color: '#fca5a5' }}>Rejection Criteria</h4>
-                            <div style={{ fontSize: '0.85rem' }}>
-                                Admin notes must contain rejection reason (minimum 10 characters)
-                                <span style={{ marginLeft: '0.5rem', color: rejectionReasonEligible ? '#34d399' : '#f87171' }}>
-                                    {rejectionReasonEligible ? 'PASS' : 'FAIL'}
-                                </span>
-                            </div>
-                        </div>
-
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                            <button
-                                className={`btn ${student.applicationStatus === 'PENDING' ? 'btn-primary' : 'btn-secondary'}`}
-                                style={student.applicationStatus === 'PENDING' ? { background: '#fbbf24', color: '#000' } : {}}
-                                onClick={() => handleStatusUpdate('PENDING')}
-                                disabled={statusUpdating}
-                            >
-                                Set as Pending
-                            </button>
-                            <button
-                                className={`btn ${student.applicationStatus === 'UNDER_REVIEW' ? 'btn-primary' : 'btn-secondary'}`}
-                                style={student.applicationStatus === 'UNDER_REVIEW' ? { background: '#60a5fa' } : {}}
-                                onClick={() => handleStatusUpdate('UNDER_REVIEW')}
-                                disabled={statusUpdating}
-                            >
-                                Mark Under Review
-                            </button>
-                            <button
-                                className={`btn ${student.applicationStatus === 'APPROVED' ? 'btn-primary' : 'btn-secondary'}`}
-                                style={student.applicationStatus === 'APPROVED' ? { background: '#34d399' } : {}}
-                                onClick={() => handleStatusUpdate('APPROVED')}
-                                disabled={statusUpdating}
-                            >
-                                Approve Application
-                            </button>
-                            <button
-                                className={`btn ${student.applicationStatus === 'WAITLISTED' ? 'btn-primary' : 'btn-secondary'}`}
-                                style={student.applicationStatus === 'WAITLISTED' ? { background: '#c084fc' } : {}}
-                                onClick={() => handleStatusUpdate('WAITLISTED')}
-                                disabled={statusUpdating}
-                            >
-                                Move to Waitlist
-                            </button>
-                            <button
-                                className={`btn ${student.applicationStatus === 'REJECTED' ? 'btn-primary' : 'btn-secondary'}`}
-                                style={student.applicationStatus === 'REJECTED' ? { background: '#f87171' } : {}}
-                                onClick={() => handleStatusUpdate('REJECTED')}
-                                disabled={statusUpdating}
-                            >
-                                Reject Application
-                            </button>
+                            <button className={`btn ${student.applicationStatus === 'PENDING' ? 'btn-primary' : 'btn-secondary'}`} style={student.applicationStatus === 'PENDING' ? { background: '#fbbf24', color: '#000' } : {}} onClick={() => handleStatusUpdate('PENDING')} disabled={statusUpdating}>Set as Pending</button>
+                            <button className={`btn ${student.applicationStatus === 'UNDER_REVIEW' ? 'btn-primary' : 'btn-secondary'}`} style={student.applicationStatus === 'UNDER_REVIEW' ? { background: '#60a5fa' } : {}} onClick={() => handleStatusUpdate('UNDER_REVIEW')} disabled={statusUpdating}>Mark Under Review</button>
+                            <button className={`btn ${student.applicationStatus === 'APPROVED' ? 'btn-primary' : 'btn-secondary'}`} style={student.applicationStatus === 'APPROVED' ? { background: '#34d399' } : {}} onClick={() => handleStatusUpdate('APPROVED')} disabled={statusUpdating}>Approve Application</button>
+                            <button className={`btn ${student.applicationStatus === 'WAITLISTED' ? 'btn-primary' : 'btn-secondary'}`} style={student.applicationStatus === 'WAITLISTED' ? { background: '#c084fc' } : {}} onClick={() => handleStatusUpdate('WAITLISTED')} disabled={statusUpdating}>Move to Waitlist</button>
+                            <button className={`btn ${student.applicationStatus === 'REJECTED' ? 'btn-primary' : 'btn-secondary'}`} style={student.applicationStatus === 'REJECTED' ? { background: '#f87171' } : {}} onClick={() => handleStatusUpdate('REJECTED')} disabled={statusUpdating}>Reject Application</button>
                         </div>
-
                         {student.createdAt && (
                             <div style={{ marginTop: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                                <FiClock /> Application submitted on {new Date(student.createdAt).toLocaleDateString()}
+                                <FiClock /> Submitted on {new Date(student.createdAt).toLocaleDateString()}
                             </div>
                         )}
                     </div>
-
                     <div className="glass-panel detail-section mt-6">
                         <h3 style={{ marginBottom: '1rem' }}>Admin Notes</h3>
                         {student.notes ? (
-                            <p style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '8px', fontSize: '0.9rem', lineHeight: '1.5' }}>
-                                {student.notes}
-                            </p>
-                        ) : (
-                            <p className="text-muted italic" style={{ fontStyle: 'italic' }}>No notes added yet.</p>
-                        )}
-                        <button
-                            className="btn btn-secondary mt-4 w-full"
-                            style={{ width: '100%', justifyContent: 'center' }}
-                            onClick={() => navigate(`/students/${id}/edit`)}
-                        >
-                            Update Notes
-                        </button>
+                            <p style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '8px', fontSize: '0.9rem', lineHeight: '1.5' }}>{student.notes}</p>
+                        ) : <p className="text-muted italic" style={{ fontStyle: 'italic' }}>No notes added yet.</p>}
+                        <button className="btn btn-secondary mt-4 w-full" style={{ width: '100%', justifyContent: 'center' }} onClick={() => navigate(`/students/${id}/edit`)}>Update Notes</button>
                     </div>
                 </div>
             </div>
